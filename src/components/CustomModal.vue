@@ -10,7 +10,6 @@
       </div>
     </div>
   </template>
-  
   <script>
   export default {
     props: ['message'],
@@ -25,7 +24,7 @@
         }
       },
       handleAction(action) {
-        this.playButtonSound();
+        //this.playButtonSound();
         setTimeout(() => {
           if (action === 'confirm') {
             this.$emit('confirm');

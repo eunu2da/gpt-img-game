@@ -6,22 +6,16 @@
         <img class="music-area" src = "../assets/client/sound_off.png" v-if="!isPlaying"  @click="toggleMusic">
          -->
         <!-- 배경 음악 오디오 요소 -->
-        <audio ref="backgroundMusic" loop>
-          <source src="../assets/music/console.mp4" type="audio/mpeg">
-          Your browser does not support the audio element.
-        </audio>
+        
         
         <!-- 버블 소리 오디오 요소 -->
-        <audio ref="bubbleSound" preload="auto">
+        <!-- <audio ref="bubbleSound" preload="auto">
           <source src="../assets/music/water.mp4" type="audio/mpeg">
-        </audio>
-          
-        <!-- 게임 배경 이미지 -->
-        <img src="@/assets/console.png" alt="Console Background" class="console-img">
-        
+        </audio> -->
+                  
         <!-- 게임 영역 -->
         <div id="game-area">
-          <div ref="gameArea"  
+          <!-- <div ref="gameArea"  
             v-for="participant in participants"     
             :key="participant.id"
             class="participant"
@@ -31,16 +25,16 @@
           <span>{{ nickname }}</span>
           <span v-if="firstPlace && participant.id === firstPlace.id" class="crown">👑</span>
             {{ participant.emoji }}
-          </div>
+          </div> -->
         <!-- 버블 요소 -->
-        <div
+        <!-- <div
           v-for="bubble in bubbles"
           :key="bubble.id"
           :ref="'bubble-' + bubble.id"
           :class="['bubble', { 'exploded': bubble.exploded }]"
           :style="{ left: bubble.x * gameAreaWidth + 'px', top: bubble.y * gameAreaHeight + 'px', animationDelay: bubble.delay + 's' }"
         >
-        </div>
+        </div> -->
         </div>
     </div>
   </div>
@@ -155,14 +149,6 @@ export default {
   overflow: hidden;
 }
 
-.console-img {
-  overflow: hidden;
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  z-index: -1;
-}
 
 #game-area {
   position: absolute;

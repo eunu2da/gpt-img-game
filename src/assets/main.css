@@ -14,13 +14,13 @@ body, html {
     user-select: none; /* 표준 문법 */
     touch-action: none; /* 두 번 클릭 확대 방지 */
     background-color: black;
-    font-family: "Jua", sans-serif;
+    font-family: monospace;
     font-weight: 400;
     font-style: normal;
 }
 
 button{
-    font-family: "Jua", sans-serif;
+    font-family: monospace;
     font-weight: 400;
     font-style: normal;
 }

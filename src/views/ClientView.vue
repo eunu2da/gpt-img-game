@@ -19,53 +19,23 @@
            <!-- 현재 위치 표시 -->
           <div class="back-button"></div>
           <!-- 방장의 시작을 기다리는 중일때만 show -->
-          <div class="neon-container" v-if="nickname && !gameStart">
+          <div class="neon-container" v-if="nickname && !gameStart && !host">
             <div v-if="showWelcomeMessage" class="newPartiMsg">{{ welcomeMessage }}</div>
             <div v-else class="welcomeMsg">{{nickname}}님 환영합니다. Good luck 🤞</div>
-          </div>
-          <div id="currentPosition" class="currentPosition" v-if="showGameArea">
-          {{ currentPosition }}
-          </div> 
-          <!--내 이모지 표시 -->
-          <div id="myEmoji" class="myEmojiBox" v-if="showMyCharacter">
-            <h5 class="me">{{isHost}}</h5> 
-            <span class="myCharacter">{{ myEmoji }}</span>
-            <div v-if="gameStart && currentRank" >
-              <span class="myRank">현재 {{currentRank}}등!</span>
-            </div>
           </div>
         </div>
       </div>
      
       <div class="game_area_wrapper">
         <div class="game_area_container">
-          <!-- 게임 배경 이미지 -->
-          <img src="@/assets/console.png" alt="Console Background" class="console-img">
           <!-- GameArea 컴포넌트 -->
           <GameArea v-if="showGameArea" :participants="participants" :firstPlace="firstPlace" ref="gameArea" @updateBubbleCount="updateBubbleCount"/>
-          <!-- 달리기 버튼 -->  
-          <div class="run-controls" v-if="showGameArea">
-              <div class="run-button-wrapper">
-                <button 
-                  @mousedown="runAction" 
-                  @mouseup="runStop" 
-                  @mouseleave="runStop"
-                  @touchstart="runAction" 
-                  @touchend="runStop" 
-                  ref="runButton" 
-                  class="run-button">
-                  <img src="../assets/client/run.gif" alt="Running" class="run-emoji" />
-                </button>
-                <svg class="run-button-progress" width="100" height="100">
-                  <circle cx="50" cy="50" r="45" :style="{ strokeDashoffset: progressOffset }"></circle>
-                </svg>
-              </div>
-            </div>  
+  
           </div>
         
         <!-- 접속중인 인원 표시 -->
         <div id="survivorCount" class="survivorCount" @click="toggleParticipantsList" v-if="!gameStart">
-          접속중인 인원  {{ survivorsCount }} 명
+          접속중인 인원 {{ survivorsCount }} 명
         </div> 
         
         <!-- 게임 진행 상태 표시 -->
@@ -85,26 +55,17 @@
       <div v-if="host" v-show="!gameStarted" class="host-controls">
             <button :class="['start-game-button', { animated: animateButton }]" @click="attemptStartGame">Start</button>
       </div> 
+      <div v-if="waitClient" v-show="!gameStarted" class="client-gameInfo">
+            <button :class="['game-info-button', { animated: animateButton }]" @click="gameInfo">read me.</button>
+      </div> 
       <div v-show="gameStart" class="updatedRank">
            {{ Currently1stPlace }}
       </div> 
       <!-- 방장이 start버튼 클릭시 뜨는 모달팝업 -->
       <custom-modal v-if="showModal" :message="modalMessage" @confirm="startGame" @cancel="cancelStartGame" />
-    
-      <!--조이스틱 -->
-      <div class="joystick" ref="joystick" v-if="showGameArea">
-        <div class="joystick-base" ref="joystickBase">
-          <div class="joystick-stick" ref="joystickStick">
-            <span class="joystick-emoji">{{ myEmoji }}</span>
-          </div>
-        </div>
-      </div>
+      <!--client read me  -->
+      <custom-modal v-if="clientModal" :message="modalMessage" @confirm="cancelInfoModal" @cancel="cancelInfoModal"/>
 
-      <!--세로 모드일때 -->
-      <div id="orientation-warning">
-        가로 모드로 돌리면 더 재밌게 게임을 즐기실 수 있습니다!
-      </div>
-      
       <!-- Participants List Popup -->
       <div v-if="showParticipantsList" class="participants-list-popup">
         <div class="popup-header">
@@ -177,6 +138,7 @@ export default {
       host: false,             // 호스트 여부
       gameStarted: false,      // 게임 시작 여부
       showModal: false,        // 게임시작 확인 팝업
+      clientModal: false,     
       modalMessage: '',        // 게임시작 팝업 메세지
       animateButton: false,    // 버튼 애니메이션
       runProgress: 100,        // 달리기 진행도
@@ -188,6 +150,7 @@ export default {
       welcomeMessage: '',
       welcomeMessageTimeout: null,
       previousParticipants: [], //현재까지 접속한 참가자배열
+      waitClient: false,
     };
   },
   computed: {
@@ -221,11 +184,14 @@ export default {
       }
     },
     attemptStartGame (){
-      this.playButtonSound();
       setTimeout(() => {
         this.modalMessage = `${this.survivorsCount}명으로 게임을 시작하시겠습니까? 게임 시작 이후 종료가 불가능 합니다.`;
         this.showModal = true;
       }, 1000);  
+    },
+    gameInfo(){
+        this.modalMessage = `gpt가 던지는 단어를 갤러리에서 찾으세요. 점수는 천차만별데스.`;
+        this.clientModal = true;
     },
     // 게임 시작 확인 팝업 버튼 확인 클릭시
     startGame() {
@@ -237,6 +203,9 @@ export default {
     cancelStartGame() {
       this.showModal = false;
     },
+    cancelInfoModal() {
+      this.clientModal = false;
+    },
     // 게임 종료 이후 새로고침
     returnToMain() {
       window.location.reload();
@@ -244,11 +213,11 @@ export default {
     // 게임 입장
     enterGame(nickname) {
       document.getElementById('main-screen').style.display='none';  //main screen hide
+      document.getElementById('survivorCount').style.display = 'block';
       this.showGameArea = true;
       this.showMyCharacter = true;
       this.showNumOfSurvivors = false;    
       this.nickname = nickname; //mainvue에서 전달받은 닉네임
-      this.$refs.gameStartedMusic.play();
       console.log('this.nickname?', this.nickname);
       this.$nextTick(() => {
           var gameAreaSize = document.getElementById('game-area').getBoundingClientRect();
@@ -467,8 +436,8 @@ export default {
         this.isHost = currentUser.isHost ? '👑방장👑' : '👔참가자👔';
         if (currentUser.isHost) {
           this.host = true;
-          const laughAudio = this.$refs.laugh;
-          laughAudio.play();
+        }else{
+          this.waitClient = true;
         }
       }
 
@@ -517,8 +486,6 @@ export default {
     });   
    // 방장의 start 신호 이후 게임 설명
    socket.on('gameInstructions', (data) => {
-    const waitingMusic = this.$refs.waitingMusic;
-    const gameStartedMusic = this.$refs.gameStartedMusic;
     this.gameStart = true;
 
     this.gameInstructions = data;   // 게임 지침 설명 text
@@ -528,8 +495,6 @@ export default {
     }
     if(data == '') {               
         this.runProgress = 100;     // run fill
-        this.$refs.gameStartedMusic.pause();
-        this.$refs.waitingMusic.play();
         this.startTimer();          // count 시작
       }
       
@@ -659,12 +624,13 @@ body, html {
 
 .survivorCount {
   position: fixed;
-  top: 12px;
-  right:150px;
+  font-weight: 300;
+  top: 36%;
+  font-size: 1.6em;
+  font-family:monospace;
   color: hsl(0deg 0% 100%);
-  padding: 8px;
-  border-radius: 10px;
   z-index: 1000;
+  letter-spacing: -1px;
 }
 
 .game_progress_status {
@@ -773,8 +739,8 @@ body, html {
 
 .fullscreen-buttons button {
   position: fixed;
-  top: 10px;
-  right: 10px;
+  top: 2%;
+  right: 2%;
   background-color: rgb(0 0 0 / 18%);
   border: rgb(0 0 0 / 18%);
   color: hsla(0,0%,100%,.7000000000000001);
@@ -914,23 +880,50 @@ body, html {
 }
 
 .start-game-button {
-  right: 20px;
   position: fixed;
   background-color: rgb(0 0 255 / 25%);
-  width: 100px;
-  height: 130px;
-  border: 3px solid rgba(200,241,255,.5607843137254902);
+  width: 70%;
+  height: 110px;
+  left:15%;
+  bottom:40%;
+  border: 0px solid rgba(200,241,255,.5607843137254902);
   transition: background-color 0.3s ease;
-  border-radius: 20px;
+  border-radius: 10px;
   text-align: center;
-  font-size: larger;
-  bottom: 180px;
+  font-size: 30px;
+  font-family: monospace;
+  color: #fff;
+  box-shadow: 0 8px 12px #fff;
+}
+
+.start-game-button:hover {
+  background-color: rgba(0, 0, 255, .4);
+}
+
+
+.game-info-button.animated {
+  animation: move-left-right 1s ease-in-out 2;
+}
+
+.game-info-button {
+  position: fixed;
+  background-color: rgb(0 0 255 / 25%);
+  width: 70%;
+  height: 109px;
+  left:15%;
+  border: 0px solid rgba(200,241,255,.5607843137254902);
+  transition: background-color 0.3s ease;
+  border-radius: 10px;
+  text-align: center;
+  font-size: 30px;
+  font-family: monospace;
+  bottom: 40%;
   color: #fff;
   font-weight:500;
   box-shadow: 0 8px 12px #fff;
 }
 
-.start-game-button:hover {
+.game-info-button:hover {
   background-color: rgba(0, 0, 255, .4);
 }
 
@@ -997,12 +990,13 @@ body, html {
   width: 100%;
   height: 100px; 
   display: flex;
+  top:10%;
   align-items: center;
   justify-content: center;
 }
 
 .welcomeMsg {
-  font-size: 2rem;
+  font-size: 3rem;
   color: #fff;
   text-shadow: 
     0 0 5px #00ffaa,   
