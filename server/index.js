@@ -1,8 +1,12 @@
+require("dotenv").config();
+
 const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
 const path = require("path");
 const cors = require("cors"); // CORS 패키지 추가
+const { getRandomWord } = require("./quizWords");
+const OpenAI = require("openai");
 
 const app = express();
 const server = http.createServer(app);
@@ -39,29 +43,21 @@ const emojis = [
 ];
 let currentEmojiIndex = 0; // 이모지를 순서대로 할당하기 위해 이모지 인덱스 변수 선언
 let gameEnded = true; // 게임 종료 상태
-let gameStarted = false; // 게임 시작 상태
+let gameStarted = false; // 게임 시작 상태;
 
 const PORT = process.env.PORT || 4000;
 let hostId = null; // 방장 ID 저장
 let isHost = false; // 방장 여부 저장
-let bubbles = [];
 
-// 버블 생성 함수
-function startBubbleGeneration() {
-  setInterval(() => {
-    if (bubbles.length >= 20) {
-      bubbles.shift(); // 오래된 버블 제거
-    }
-    const bubble = {
-      id: Date.now() + Math.random(),
-      x: Math.random() * 0.9, // 비율로 전송
-      y: Math.random() * 0.7, // 비율로 전송
-      delay: Math.random() * 2,
-    };
-    bubbles.push(bubble);
-    io.emit("newBubble", bubble); // 모든 클라이언트에게 전송
-  }, 1000); // 1초마다 버블 생성
-}
+// OpenAI 설정
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// 게임 상태 변수 추가
+let currentWord = null;
+let roundTime = 60; // 라운드 시간 (초)
+let submissions = new Map(); // 제출된 이미지 저장
 
 // 클라이언트가 소켓에 연결되었을 때
 io.on("connection", (socket) => {
@@ -118,61 +114,6 @@ io.on("connection", (socket) => {
     console.log("모두에게 participants 정보를 전달", participants);
   });
 
-  // 참가자의 위치가 업데이트 되었을 때
-  socket.on("updateParticipantPosition", (updatedParticipant) => {
-    const participant = participants.find(
-      (p) => p.id === updatedParticipant.id
-    );
-
-    if (participant) {
-      participant.x = updatedParticipant.x;
-      participant.y = updatedParticipant.y;
-      io.emit("positionUpdate", participant);
-    }
-  });
-
-  // 참가자가 버블을 터뜨렸을 때
-  socket.on("bubbleBuster", (data) => {
-    const currentUserIndex = participants.findIndex((p) => p.id === data.id);
-    if (currentUserIndex !== -1) {
-      participants[currentUserIndex].bCount = data.bCount;
-    } else {
-      participants.push({
-        id: data.id,
-        emoji: data.emoji,
-        bCount: data.bCount,
-      });
-    }
-    const newSortedParticipants = [...participants].sort(
-      (a, b) => b.bCount - a.bCount
-    );
-    console.log("버블갯수로 sort된 참가자들 !!!!!!", newSortedParticipants);
-
-    let currentRank = 1;
-
-    newSortedParticipants.forEach((participant, index) => {
-      if (
-        index > 0 &&
-        newSortedParticipants[index].bCount ===
-          newSortedParticipants[index - 1].bCount
-      ) {
-        io.to(participant.id).emit("rankUpdate", {
-          rank: currentRank,
-          bCount: participant.bCount,
-          firstPlace: newSortedParticipants[0],
-          allParticipants: newSortedParticipants,
-        });
-      } else {
-        currentRank = index + 1;
-        io.to(participant.id).emit("rankUpdate", {
-          rank: currentRank,
-          bCount: participant.bCount,
-          firstPlace: newSortedParticipants[0],
-          allParticipants: newSortedParticipants,
-        });
-      }
-    });
-  });
   // 참가자와의 연결이 끊어졌을 때
   socket.on("disconnect", () => {
     if (socket.id === hostId) {
@@ -185,39 +126,137 @@ io.on("connection", (socket) => {
     console.log("======================================================");
     io.emit("updateParticipants", participants);
   });
+
   // 방장의 start game 신호
   socket.on("startGame", () => {
-    gameStarted = true;
-    gameEnded = false; // 게임 시작 시 게임 종료 상태를 초기화
-    const gameInstructions = [
-      "이 게임은 방울을 많이 터트리는 사람이 우승하는 게임이에요.",
-      "어떤 방울 안에는 특별한 선물도 들어있답니다~ㅎㅎ",
-      "그럼 준비하시고 ~",
-      3,
-      2,
-      1,
-      "start!",
-    ];
-    function sendInstruction(index) {
-      if (index < gameInstructions.length) {
-        io.emit("gameInstructions", gameInstructions[index]);
-        setTimeout(() => sendInstruction(index + 1), 1600);
-      } else {
-        io.emit("gameInstructions", ""); // 모든 지침 전송 이후 마지막으로 빈 문자열을 보냄
-        startBubbleGeneration(); // 버블 생성 시작
-        setTimeout(() => {
-          if (!gameEnded) {
-            io.emit("showRank");
-            console.log("게임이 종료되었습니다.");
-            gameStarted = false;
-            gameEnded = true; // 게임 종료 상태 true
-          }
-        }, 30000); // 120초 후에 게임 종료
+    if (socket.id === hostId) {
+      gameStarted = true;
+      gameEnded = false;
+      currentWord = getRandomWord(); // 랜덤 단어 선택
+
+      const gameInstructions = [
+        "제시어와 관련된 사진을 갤러리에서 찾아주세요!",
+        `이번 라운드의 제시어는 "${currentWord}" 입니다.`,
+        "준비하시고~",
+        3,
+        2,
+        1,
+        "start!",
+      ];
+
+      function sendInstruction(index) {
+        if (index < gameInstructions.length) {
+          io.emit("gameInstructions", gameInstructions[index]);
+          setTimeout(() => sendInstruction(index + 1), 1600);
+        } else {
+          io.emit("gameInstructions", "");
+          startRoundTimer(); // 라운드 타이머 시작
+        }
       }
+      sendInstruction(0);
     }
-    sendInstruction(0); // 시작
+  });
+
+  // 방장이 제시어 설정
+  socket.on("setWord", async (word) => {
+    if (socket.id === hostId) {
+      currentWord = word;
+      io.emit("newWord", word);
+      startRoundTimer();
+    }
+  });
+
+  // 참가자가 이미지 제출
+  socket.on("submitImage", async (data) => {
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `이 이미지에 "${currentWord}"가 포함되어 있나요? 간단히 예/아니오로 대답해주세요.`,
+              },
+              {
+                type: "image_url",
+                url: `data:image/jpeg;base64,${data.base64Image}`, // base64 이미지 직접 전달
+              },
+            ],
+          },
+        ],
+      });
+
+      const isValid = response.choices[0].message.content
+        .toLowerCase()
+        .includes("예");
+
+      // 결과 저장 및 점수 업데이트
+      submissions.set(socket.id, {
+        imageUrl: data.imageUrl,
+        isValid: isValid,
+        submitTime: Date.now(),
+      });
+
+      // 개별 참가자에게 결과 전송
+      socket.emit("submissionResult", { isValid });
+
+      // 전체 참가자에게 현재 제출 현황 업데이트
+      updateGameStatus();
+    } catch (error) {
+      console.error(error);
+      socket.emit("error", "이미지 검증 중 오류가 발생했습니다.");
+    }
   });
 });
+
+function startRoundTimer() {
+  gameStarted = true;
+  submissions.clear();
+
+  const endTime = Date.now() + roundTime * 1000;
+
+  const timer = setInterval(() => {
+    const remaining = Math.ceil((endTime - Date.now()) / 1000);
+
+    if (remaining <= 0) {
+      clearInterval(timer);
+      endRound();
+    } else {
+      io.emit("timeRemaining", remaining);
+    }
+  }, 1000);
+}
+
+function endRound() {
+  gameStarted = false;
+
+  // 결과 집계
+  const results = Array.from(submissions.entries()).map(([playerId, data]) => {
+    const participant = participants.find((p) => p.id === playerId);
+    return {
+      nickname: participant.nickname,
+      isValid: data.isValid,
+      submitTime: data.submitTime,
+    };
+  });
+
+  io.emit("roundEnd", results);
+}
+
+function updateGameStatus() {
+  const status = Array.from(submissions.entries()).map(([playerId, data]) => {
+    const participant = participants.find((p) => p.id === playerId);
+    return {
+      nickname: participant.nickname,
+      hasSubmitted: true,
+      isValid: data.isValid,
+    };
+  });
+
+  io.emit("gameStatus", status);
+}
 
 // 정적 파일 serve
 app.use(express.static(path.join(__dirname, "../dist")));
