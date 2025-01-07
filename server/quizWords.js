@@ -52,7 +52,7 @@ const quizWords = [
 ];
 
 function getRandomWord() {
-  return words[Math.floor(Math.random() * quizWords.length)];
+  return quizWords[Math.floor(Math.random() * quizWords.length)];
 }
 
 module.exports = { quizWords, getRandomWord };

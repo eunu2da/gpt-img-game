@@ -136,12 +136,12 @@ io.on("connection", (socket) => {
 
       const gameInstructions = [
         "제시어와 관련된 사진을 갤러리에서 찾아주세요!",
-        `이번 라운드의 제시어는 "${currentWord}" 입니다.`,
         "준비하시고~",
         3,
         2,
         1,
         "start!",
+        currentWord,
       ];
 
       function sendInstruction(index) {
@@ -157,57 +157,45 @@ io.on("connection", (socket) => {
     }
   });
 
-  // 방장이 제시어 설정
-  socket.on("setWord", async (word) => {
-    if (socket.id === hostId) {
-      currentWord = word;
-      io.emit("newWord", word);
-      startRoundTimer();
-    }
-  });
-
   // 참가자가 이미지 제출
   socket.on("submitImage", async (data) => {
-    try {
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: `이 이미지에 "${currentWord}"가 포함되어 있나요? 간단히 예/아니오로 대답해주세요.`,
-              },
-              {
-                type: "image_url",
-                url: `data:image/jpeg;base64,${data.base64Image}`, // base64 이미지 직접 전달
-              },
-            ],
-          },
-        ],
-      });
-
-      const isValid = response.choices[0].message.content
-        .toLowerCase()
-        .includes("예");
-
-      // 결과 저장 및 점수 업데이트
-      submissions.set(socket.id, {
-        imageUrl: data.imageUrl,
-        isValid: isValid,
-        submitTime: Date.now(),
-      });
-
-      // 개별 참가자에게 결과 전송
-      socket.emit("submissionResult", { isValid });
-
-      // 전체 참가자에게 현재 제출 현황 업데이트
-      updateGameStatus();
-    } catch (error) {
-      console.error(error);
-      socket.emit("error", "이미지 검증 중 오류가 발생했습니다.");
-    }
+    console.log("제출된 이미지 : ", data);
+    // try {
+    //   const response = await openai.chat.completions.create({
+    //     model: "gpt-4o-mini",
+    //     messages: [
+    //       {
+    //         role: "user",
+    //         content: [
+    //           {
+    //             type: "text",
+    //             text: `이 이미지에 "${currentWord}"가 포함되어 있나요? 간단히 예/아니오로 대답해주세요.`,
+    //           },
+    //           {
+    //             type: "image_url",
+    //             url: `data:image/jpeg;base64,${data.base64Image}`, // base64 이미지 직접 전달
+    //           },
+    //         ],
+    //       },
+    //     ],
+    //   });
+    //   const isValid = response.choices[0].message.content
+    //     .toLowerCase()
+    //     .includes("예");
+    //   // 결과 저장 및 점수 업데이트
+    //   submissions.set(socket.id, {
+    //     imageUrl: data.imageUrl,
+    //     isValid: isValid,
+    //     submitTime: Date.now(),
+    //   });
+    //   // 개별 참가자에게 결과 전송
+    //   socket.emit("submissionResult", { isValid });
+    //   // 전체 참가자에게 현재 제출 현황 업데이트
+    //   updateGameStatus();
+    // } catch (error) {
+    //   console.error(error);
+    //   socket.emit("error", "이미지 검증 중 오류가 발생했습니다.");
+    // }
   });
 });
 
