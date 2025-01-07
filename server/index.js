@@ -158,44 +158,60 @@ io.on("connection", (socket) => {
   });
 
   // 참가자가 이미지 제출
-  socket.on("submitImage", async (data) => {
-    console.log("제출된 이미지 : ", data);
-    // try {
-    //   const response = await openai.chat.completions.create({
-    //     model: "gpt-4o-mini",
-    //     messages: [
-    //       {
-    //         role: "user",
-    //         content: [
-    //           {
-    //             type: "text",
-    //             text: `이 이미지에 "${currentWord}"가 포함되어 있나요? 간단히 예/아니오로 대답해주세요.`,
-    //           },
-    //           {
-    //             type: "image_url",
-    //             url: `data:image/jpeg;base64,${data.base64Image}`, // base64 이미지 직접 전달
-    //           },
-    //         ],
-    //       },
-    //     ],
-    //   });
-    //   const isValid = response.choices[0].message.content
-    //     .toLowerCase()
-    //     .includes("예");
-    //   // 결과 저장 및 점수 업데이트
-    //   submissions.set(socket.id, {
-    //     imageUrl: data.imageUrl,
-    //     isValid: isValid,
-    //     submitTime: Date.now(),
-    //   });
-    //   // 개별 참가자에게 결과 전송
-    //   socket.emit("submissionResult", { isValid });
-    //   // 전체 참가자에게 현재 제출 현황 업데이트
-    //   updateGameStatus();
-    // } catch (error) {
-    //   console.error(error);
-    //   socket.emit("error", "이미지 검증 중 오류가 발생했습니다.");
-    // }
+  socket.on("submitImage", async (data, callback) => {
+    // 이미 제출했는지 확인
+    if (submissions.has(socket.id)) {
+      socket.emit("error", "이미지를 이미 제출하셨습니다.");
+      return;
+    }
+
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `이 이미지에 "${currentWord}"가 포함되어 있나요? 0~100 사이의 점수로 평가해주세요.`,
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:image/jpeg;base64,${data.base64Image}`,
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      console.log("response", response);
+      const score = response.choices[0].message.content;
+      console.log("score", score);
+
+      // 결과 저장 및 점수 업데이트
+      submissions.set(socket.id, {
+        imageUrl: data.imageUrl,
+        submitTime: Date.now(),
+        score,
+      });
+
+      // 개별 참가자에게 결과 전송
+      socket.emit("submissionResult", { score });
+
+      // callback을 사용하여 점수를 반환
+      if (callback) {
+        callback({ score });
+      }
+
+      // 전체 참가자에게 현재 제출 현황 업데이트
+      updateGameStatus();
+    } catch (error) {
+      console.error(error);
+      socket.emit("error", "이미지 검증 중 오류가 발생했습니다.");
+    }
   });
 });
 
