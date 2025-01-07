@@ -39,11 +39,9 @@
         </div> 
         
         <!-- 게임 진행 상태 표시 -->
-        <div class="game_progress_status" v-if="gameStart">
-          <span style="margin-right: 25px;">my rank 🏆: {{currentRank}} </span>
+        <!-- <div class="game_progress_status" v-if="gameStart">
           <span style="margin-right: 30px;"> 남은 종료 시간 : {{remainingTime}}⏳️ </span>
-          <span> {{ bubbleCountText }}</span>            
-        </div>
+        </div> -->
 
         <!-- 전체 화면 버튼(android에서만 표시)-->
         <div class="fullscreen-buttons" v-if="isAndroidDevice">
@@ -57,9 +55,6 @@
       </div> 
       <div v-if="waitClient" v-show="!gameStarted" class="client-gameInfo">
             <button :class="['game-info-button', { animated: animateButton }]" @click="gameInfo">read me.</button>
-      </div> 
-      <div v-show="gameStart" class="updatedRank">
-           {{ Currently1stPlace }}
       </div> 
       <!-- 방장이 start버튼 클릭시 뜨는 모달팝업 -->
       <custom-modal v-if="showModal" :message="modalMessage" @confirm="startGame" @cancel="cancelStartGame" />
